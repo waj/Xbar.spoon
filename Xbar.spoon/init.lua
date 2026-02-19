@@ -397,6 +397,19 @@ local function buildMenuItems(flatItems, pluginCtx)
   end
   cleanMenus(root)
 
+  -- Disable non-actionable items (no fn, no submenu)
+  local function disableNonActionable(items)
+    for _, entry in ipairs(items) do
+      if not entry.fn and not entry.menu and not entry.disabled and entry.title ~= "-" then
+        entry.disabled = true
+      end
+      if entry.menu then
+        disableNonActionable(entry.menu)
+      end
+    end
+  end
+  disableNonActionable(root)
+
   return root
 end
 
