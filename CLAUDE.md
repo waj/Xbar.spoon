@@ -4,7 +4,7 @@ Hammerspoon Spoon that replaces the dead xbar macOS app. Runs xbar-compatible pl
 
 ## Structure
 
-Single-file Spoon: `Xbar.spoon/init.lua` (~710 lines). All logic in one file per Hammerspoon convention.
+Single-file Spoon: `init.lua` (~810 lines). All logic in one file per Hammerspoon convention. The repo is intended to be cloned as `Xbar.spoon` into `~/.hammerspoon/Spoons/`.
 
 ## Key Design Decisions
 
@@ -36,5 +36,5 @@ No automated tests (Hammerspoon API not available outside the app). Test manuall
 ## Syntax Check
 
 ```sh
-luac -p Xbar.spoon/init.lua
+luac -p init.lua
 ```
