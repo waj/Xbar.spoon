@@ -358,6 +358,10 @@ local function buildMenuItems(flatItems, pluginCtx)
 
   for _, item in ipairs(flatItems) do
     if item.separator then
+      -- Pop stack back to root level for separators
+      while #stack > 1 and stack[#stack].level >= 0 do
+        table.remove(stack)
+      end
       local parent = stack[#stack]
       table.insert(parent.items, { title = "-" })
     else
