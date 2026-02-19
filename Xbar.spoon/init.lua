@@ -622,7 +622,7 @@ local function scanDirectory(self)
         path = path,
         name = parsed.name,
         interval = parsed.interval,
-        menubar = hs.menubar.new(),
+        menubar = hs.menubar.new(true, parsed.name),
         timer = nil,
         cycleTimer = nil,
         task = nil,
