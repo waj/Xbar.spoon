@@ -573,6 +573,11 @@ local function updateMenubar(plugin)
         disabled = true,
       })
     end
+    table.insert(result, {
+      title = "Refresh",
+      shortcut = "r",
+      fn = function() refreshPlugin(plugin) end,
+    })
 
     return result
   end)
