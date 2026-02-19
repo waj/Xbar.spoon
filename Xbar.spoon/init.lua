@@ -407,6 +407,24 @@ local function isDarkMode()
   return result and "true" or "false"
 end
 
+local function loadVarsFile(pluginPath)
+  local varsPath = pluginPath .. ".vars.json"
+  local f = io.open(varsPath, "r")
+  if not f then return {} end
+  local content = f:read("*a")
+  f:close()
+  local ok, decoded = pcall(hs.json.decode, content)
+  if not ok or type(decoded) ~= "table" then
+    log.w("Failed to parse vars file: " .. varsPath)
+    return {}
+  end
+  local vars = {}
+  for k, v in pairs(decoded) do
+    vars[tostring(k)] = tostring(v)
+  end
+  return vars
+end
+
 local function executePlugin(plugin, callback)
   -- Skip if previous task still running
   if plugin.task and plugin.task:isRunning() then
@@ -420,6 +438,10 @@ local function executePlugin(plugin, callback)
     HOME = os.getenv("HOME") or "",
     SHELL = os.getenv("SHELL") or "/bin/zsh",
   }
+
+  for k, v in pairs(loadVarsFile(plugin.path)) do
+    env[k] = v
+  end
 
   plugin.task = hs.task.new(plugin.path, function(exitCode, stdOut, stdErr)
     plugin.task = nil
