@@ -461,6 +461,20 @@ local function executePlugin(plugin, callback)
 end
 
 --------------------------------------------------------------------------------
+-- Relative Time Formatter
+--------------------------------------------------------------------------------
+
+local function relativeTime(timestamp)
+  if not timestamp then return nil end
+  local diff = os.time() - timestamp
+  if diff < 10 then return "just now" end
+  if diff < 60 then return diff .. "s ago" end
+  if diff < 3600 then return math.floor(diff / 60) .. "m ago" end
+  if diff < 86400 then return math.floor(diff / 3600) .. "h ago" end
+  return math.floor(diff / 86400) .. "d ago"
+end
+
+--------------------------------------------------------------------------------
 -- Plugin Lifecycle
 --------------------------------------------------------------------------------
 
@@ -482,7 +496,11 @@ local function updateMenubar(plugin)
   local function applyTitle(idx)
     local t = titles[idx]
     if not t then return end
-    local styled = buildStyledText(t.text, t.params)
+    local text = t.text
+    if plugin.lastError then
+      text = text .. " ⚠"
+    end
+    local styled = buildStyledText(text, t.params)
     plugin.menubar:setTitle(styled)
     local img = buildImage(t.params)
     if img then
@@ -512,26 +530,51 @@ local function updateMenubar(plugin)
     local mods = hs.eventtap.checkKeyboardModifiers()
     local items = buildMenuItems(menuItems, pluginCtx)
 
+    local result
     if mods.alt then
       -- Show alternate items, hide non-alternate items that have an alternate sibling
-      return items
+      result = items
     else
       -- Filter out alternate items
-      local filtered = {}
       local function filterAlternates(menuList)
-        local result = {}
+        local filtered = {}
         for _, entry in ipairs(menuList) do
           if not entry.alternate then
             if entry.menu then
               entry.menu = filterAlternates(entry.menu)
             end
-            table.insert(result, entry)
+            table.insert(filtered, entry)
           end
         end
-        return result
+        return filtered
       end
-      return filterAlternates(items)
+      result = filterAlternates(items)
     end
+
+    -- Append status footer
+    table.insert(result, { title = "-" })
+    local statusText
+    if plugin.lastRefresh then
+      statusText = plugin.name .. " · Updated " .. relativeTime(plugin.lastRefresh)
+    else
+      statusText = plugin.name .. " · Loading..."
+    end
+    table.insert(result, {
+      title = hs.styledtext.new(statusText, { color = { hex = "#888888" }, font = { size = 11 } }),
+      disabled = true,
+    })
+    if plugin.lastError then
+      local errDisplay = plugin.lastError
+      if #errDisplay > 80 then
+        errDisplay = errDisplay:sub(1, 80) .. "…"
+      end
+      table.insert(result, {
+        title = hs.styledtext.new("⚠ " .. errDisplay, { color = { hex = "#CC6666" }, font = { size = 11 } }),
+        disabled = true,
+      })
+    end
+
+    return result
   end)
 end
 
@@ -539,24 +582,36 @@ refreshPlugin = function(plugin)
   executePlugin(plugin, function(exitCode, stdOut, stdErr)
     if exitCode ~= 0 then
       log.w(plugin.name .. " exited with code " .. tostring(exitCode))
-      plugin.titles = { { text = plugin.name .. " ⚠", params = {} } }
-      plugin.menuItems = {
-        { text = "Error (exit code " .. tostring(exitCode) .. ")", params = { disabled = "true" }, level = 0 },
-      }
+      local errMsg = "Error (exit code " .. tostring(exitCode) .. ")"
       if stdErr and #stdErr > 0 then
-        table.insert(plugin.menuItems, { text = stdErr:sub(1, 200), params = { disabled = "true" }, level = 0 })
+        errMsg = errMsg .. ": " .. stdErr:sub(1, 200):gsub("\n", " ")
       end
+      plugin.lastError = errMsg
+      if #plugin.menuItems == 0 then
+        -- Never loaded successfully — show error in menu
+        plugin.titles = { { text = plugin.name .. " ⚠", params = {} } }
+        plugin.menuItems = {
+          { text = errMsg, params = { disabled = "true" }, level = 0 },
+        }
+      end
+      -- Otherwise keep existing titles/menuItems, footer will show the error
     else
       local ok, titles, menuItems = pcall(parseOutput, stdOut)
       if ok then
         plugin.titles = titles
         plugin.menuItems = menuItems
+        plugin.lastRefresh = os.time()
+        plugin.lastError = nil
       else
         log.e("Parse error for " .. plugin.name .. ": " .. tostring(titles))
-        plugin.titles = { { text = plugin.name .. " ⚠", params = {} } }
-        plugin.menuItems = {
-          { text = "Parse error", params = { disabled = "true" }, level = 0 },
-        }
+        local errMsg = "Parse error: " .. tostring(titles):sub(1, 200)
+        plugin.lastError = errMsg
+        if #plugin.menuItems == 0 then
+          plugin.titles = { { text = plugin.name .. " ⚠", params = {} } }
+          plugin.menuItems = {
+            { text = errMsg, params = { disabled = "true" }, level = 0 },
+          }
+        end
       end
     end
     updateMenubar(plugin)
@@ -629,6 +684,8 @@ local function scanDirectory(self)
         titles = { { text = parsed.name, params = {} } },
         menuItems = {},
         cycleIndex = 1,
+        lastRefresh = nil,
+        lastError = nil,
       }
       self.plugins[path] = plugin
 
