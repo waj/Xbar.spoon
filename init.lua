@@ -19,6 +19,15 @@ obj.license = "MIT"
 --- Defaults to `~/Library/Application Support/xbar/plugins`.
 obj.pluginDirectory = os.getenv("HOME") .. "/Library/Application Support/xbar/plugins"
 
+local emojiMap = require("emoji")
+
+local function replaceEmojiShortcodes(text)
+  return text:gsub(":(%-?[%w_]+):", function(shortcode)
+    local emoji = emojiMap[shortcode]
+    return emoji or ":" .. shortcode .. ":"
+  end)
+end
+
 local log = hs.logger.new("Xbar", "info")
 
 -- X11 named colors (subset commonly used in xbar plugins)
@@ -228,6 +237,9 @@ end
 
 local function buildStyledText(text, params)
   local attrs = {}
+
+  -- Replace emoji shortcodes
+  text = replaceEmojiShortcodes(text)
 
   if params.color then
     attrs.color = resolveColor(params.color)
