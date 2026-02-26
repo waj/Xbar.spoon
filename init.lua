@@ -19,7 +19,8 @@ obj.license = "MIT"
 --- Defaults to `~/Library/Application Support/xbar/plugins`.
 obj.pluginDirectory = os.getenv("HOME") .. "/Library/Application Support/xbar/plugins"
 
-local emojiMap = require("emoji")
+local spoonPath = hs.spoons.scriptPath()
+local emojiMap = dofile(spoonPath .. "/emoji.lua")
 
 local function replaceEmojiShortcodes(text)
   return text:gsub(":(%-?[%w_]+):", function(shortcode)
